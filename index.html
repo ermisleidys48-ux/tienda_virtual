@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda Virtual</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<nav>
+    <div class="logo" id="store-logo">...</div>
+    <div>
+        <button id="btn-admin" class="btn btn-admin" onclick="showModal('modalAdmin')">ADMIN</button>
+        <button class="btn btn-blue" onclick="showModal('modalAuth')" id="btn-user">Acceder</button>
+        <button class="btn btn-blue" onclick="showModal('modalCart')" style="margin-left: 10px;">
+            <i class="fas fa-shopping-cart"></i>&nbsp;<span id="count">0</span>
+        </button>
+    </div>
+</nav>
+
+<div class="container">
+    <div id="loader"><div class="spinner"></div><p>Cargando...</p></div>
+    <div id="store-grid" class="grid"></div>
+</div>
+
+<div id="toast">¡Añadido!</div>
+
+<div id="modalAuth" class="modal">
+    <div class="modal-content">
+        <h2>Bienvenido</h2>
+        <input type="text" id="u-in" placeholder="Usuario">
+        <input type="password" id="p-in" placeholder="Clave">
+        <input type="text" id="a-in" placeholder="Dirección">
+        <button class="btn btn-blue" style="width:100%" onclick="login()">Entrar</button>
+    </div>
+</div>
+
+<div id="modalAdmin" class="modal">
+    <div class="modal-content">
+        <h2>Gestión Admin</h2>
+        <input type="text" id="store-name-input" placeholder="Nombre Tienda">
+        <button class="btn btn-blue" onclick="updateStoreName()">Actualizar Nombre</button>
+        <hr>
+        <h3>Nuevo Producto</h3>
+        <input type="text" id="n-prod" placeholder="Nombre">
+        <input type="number" id="p-prod" placeholder="Precio">
+        <input type="number" id="s-prod" placeholder="Stock">
+        <input type="file" id="i-prod">
+        <button class="btn btn-admin" style="display:block; width:100%" onclick="save()">Publicar</button>
+        <button onclick="closeModal('modalAdmin')" style="background:none; color:white; width:100%; border:none; cursor:pointer;">Cerrar</button>
+    </div>
+</div>
+
+<div id="modalCart" class="modal">
+    <div class="modal-content">
+        <h2>Carrito</h2>
+        <div id="cart-list"></div>
+        <select id="shipping-method" onchange="updateCart()">
+            <option value="pickup">Retiro en tienda</option>
+            <option value="delivery">Envío a Domicilio</option>
+        </select>
+        <h3>Total: <span id="cart-total">$0</span></h3>
+        <button class="btn btn-blue" style="width:100%" onclick="checkout()">Comprar</button>
+    </div>
+</div>
+
+<div id="modalInvoice" class="modal">
+    <div class="modal-content">
+        <h2>¡Éxito!</h2>
+        <div id="invoice-details" class="invoice-box"></div>
+        <button class="btn btn-whatsapp" onclick="shareWhatsApp()">WhatsApp</button>
+        <button onclick="closeModal('modalInvoice')">Cerrar</button>
+    </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/tienda.js"></script>
+<script src="js/admin.js"></script>
+
+</body>
+</html>
