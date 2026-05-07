@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Total - V-TECH</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --accent: #38bdf8;
+            --text: #f1f5f9; --green: #22c55e; --red: #ef4444; --border: #334155;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        h1, h2 { color: var(--accent); }
+        
+        /* Contenedores Principales */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+        
+        /* Métricas */
+        .metric-title { font-size: 0.9rem; color: #94a3b8; margin-bottom: 10px; }
+        .metric-value { font-size: 2rem; font-weight: bold; }
+
+        /* Tabla de Almacén */
+        .almacen-container { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: rgba(0,0,0,0.2); }
+        
+        /* Inputs de edición rápida */
+        input[type="text"], input[type="number"] {
+            background: #0f172a; border: 1px solid var(--border); color: white;
+            padding: 5px; border-radius: 4px; width: 80px;
+        }
+        input.wide { width: 150px; }
+
+        .btn-save { background: var(--green); color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+        .btn-save:hover { opacity: 0.8; }
+        
+        .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { background: var(--border); border: none; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
+        .tab-btn.active { background: var(--accent); color: #000; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>SISTEMA DE ADMINISTRACIÓN V-TECH</h1>
+        <div class="tab-menu">
+            <button class="tab-btn active">Resumen y Almacén</button>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        <div class="card">
+            <div class="metric-title">ESTADO DE RESULTADOS (Utilidad Neta)</div>
+            <div id="estado-resultado" class="metric-value" style="color: var(--green);">$0.00</div>
+            <p id="detalle-resultado" style="font-size: 0.8rem; margin-top: 10px; color: #94a3b8;"></p>
+        </div>
+
+        <div class="card">
+            <div class="metric-title">EFECTIVO EN CAJA (Ventas Totales)</div>
+            <div id="efectivo-caja" class="metric-value" style="color: var(--accent);">$0.00</div>
+            <p style="font-size: 0.8rem; margin-top: 10px; color: #94a3b8;">Total acumulado de ingresos por ventas</p>
+        </div>
+    </div>
+
+    <h2>📦 Almacén de Productos</h2>
+    <div class="almacen-container">
+        <table id="tabla-almacen">
+            <thead>
+                <tr>
+                    <th>Imagen</th>
+                    <th>Nombre del Producto</th>
+                    <th>Stock</th>
+                    <th>Precio Compra</th>
+                    <th>Precio Venta</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="lista-productos">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN DE TU SUPABASE
+        const SB_URL = "https://rdyclinraavkirzfigjl.supabase.co"; 
+        const SB_KEY = "sb_publishable_fEGEgkJNYMzVPgzDaEwlsg_W1XiFyt6";
+        const supabase = supabase.createClient(SB_URL, SB_KEY);
+
+        async function cargarTodo() {
+            await cargarAlmacen();
+            await calcularFinanzas();
+        }
+
+        // CARGAR Y EDITAR ALMACÉN
+        async function cargarAlmacen() {
+            const { data, error } = await supabase.from('productos').select('*').order('name');
+            if (error) return console.error(error);
+
+            const tbody = document.getElementById('lista-productos');
+            tbody.innerHTML = "";
+
+            data.forEach(p => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><img src="${p.img}" style="width: 50px; height: 50px; border-radius: 5px; object-fit: cover;"></td>
+                        <td><input type="text" class="wide" id="n-${p.id}" value="${p.name}"></td>
+                        <td><input type="number" id="s-${p.id}" value="${p.stock}"></td>
+                        <td>$<input type="number" id="pc-${p.id}" value="${p.cost_price || 0}"></td>
+                        <td>$<input type="number" id="pv-${p.id}" value="${p.price}"></td>
+                        <td><button class="btn-save" onclick="actualizarProducto(${p.id})">Guardar</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function actualizarProducto(id) {
+            const nuevoNombre = document.getElementById(`n-${id}`).value;
+            const nuevoStock = document.getElementById(`s-${id}`).value;
+            const nuevoCosto = document.getElementById(`pc-${id}`).value;
+            const nuevoPrecio = document.getElementById(`pv-${id}`).value;
+
+            const { error } = await supabase.from('productos').update({
+                name: nuevoNombre,
+                stock: nuevoStock,
+                cost_price: nuevoCosto,
+                price: nuevoPrecio
+            }).eq('id', id);
+
+            if (error) alert("Error al actualizar");
+            else {
+                alert("Producto actualizado correctamente");
+                cargarTodo();
+            }
+        }
+
+        // CÁLCULOS DE ESTADO DE RESULTADOS Y CAJA
+        async function calcularFinanzas() {
+            // Obtenemos los movimientos de la tabla contabilidad
+            const { data: movs, error } = await supabase.from('contabilidad').select('*');
+            if (error) return;
+
+            let totalIngresos = 0;
+            let totalGananciaLimpia = 0; // Estado Resultado
+
+            movs.forEach(m => {
+                const monto = parseFloat(m.monto || 0);
+                const ganancia = parseFloat(m.ganancia || 0);
+
+                if (m.tipo === 'VENTA') {
+                    totalIngresos += monto;
+                    // El estado de resultado se alimenta de la ganancia que calculas al vender
+                    totalGananciaLimpia += ganancia; 
+                } else if (m.tipo === 'GASTO') {
+                    totalGananciaLimpia -= monto;
+                }
+            });
+
+            document.getElementById('efectivo-caja').innerText = `$${totalIngresos.toFixed(2)}`;
+            document.getElementById('estado-resultado').innerText = `$${totalGananciaLimpia.toFixed(2)}`;
+            document.getElementById('detalle-resultado').innerText = `Ingresos operativos menos costos y gastos.`;
+        }
+
+        window.onload = cargarTodo;
+    </script>
+</body>
+</html>
