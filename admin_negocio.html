@@ -3,35 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema Contable - Gestión de Inventario</title>
+    <title>Sistema Contable - Gestión de Almacén</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg: #0f172a; --card: #1e293b; --accent: #38bdf8;
-            --text: #f1f5f9; --green: #22c55e; --red: #ef4444; --border: #334155;
+            --text: #f1f5f9; --green: #22c55e; --border: #334155;
         }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
         h1, h2 { color: var(--accent); text-align: center; }
-        
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
         .card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        
-        .metric-title { font-size: 0.9rem; color: #94a3b8; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .metric-title { font-size: 0.9rem; color: #94a3b8; margin-bottom: 10px; text-transform: uppercase; }
         .metric-value { font-size: 2.2rem; font-weight: bold; }
-
-        .almacen-container { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; margin-top: 20px; }
+        .almacen-container { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; min-width: 800px; }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
         th { background: rgba(0,0,0,0.3); color: var(--accent); }
-        
-        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; width: 90px; outline: none; }
-        input:focus { border-color: var(--accent); }
+        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; width: 90px; }
         input.wide { width: 180px; }
-
-        .btn-save { background: var(--green); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .btn-save:hover { background: #16a34a; transform: scale(1.05); }
-        
-        .loader { text-align: center; padding: 20px; color: var(--accent); font-weight: bold; }
+        .btn-save { background: var(--green); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-save:hover { opacity: 0.8; transform: scale(1.02); }
     </style>
 </head>
 <body>
@@ -42,64 +34,57 @@
 
     <div class="dashboard-grid">
         <div class="card">
-            <div class="metric-title">Utilidad Neta Estimada</div>
+            <div class="metric-title">UTILIDAD NETA (Ganancias)</div>
             <div id="estado-resultado" class="metric-value" style="color: var(--green);">$0.00</div>
-            <p id="detalle-resultado" style="font-size: 0.8rem; margin-top: 10px; color: #94a3b8;">Balance total de ganancias</p>
+            <p style="font-size: 0.8rem; margin-top: 10px; color: #94a3b8;">Ingresos menos costos cargados</p>
         </div>
 
         <div class="card">
-            <div class="metric-title">Efectivo Total en Caja</div>
+            <div class="metric-title">EFECTIVO EN CAJA</div>
             <div id="efectivo-caja" class="metric-value" style="color: var(--accent);">$0.00</div>
-            <p style="font-size: 0.8rem; margin-top: 10px; color: #94a3b8;">Ingresos brutos por ventas</p>
+            <p style="font-size: 0.8rem; margin-top: 10px; color: #94a3b8;">Total bruto de ventas</p>
         </div>
     </div>
 
     <h2>📦 Almacén de Productos</h2>
     <div class="almacen-container">
-        <table id="tabla-almacen">
+        <table>
             <thead>
                 <tr>
                     <th>Imagen</th>
                     <th>Nombre del Producto</th>
                     <th>Stock</th>
-                    <th>Costo Compra</th>
+                    <th>Precio Compra</th>
                     <th>Precio Venta</th>
                     <th>Acción</th>
                 </tr>
             </thead>
             <tbody id="lista-productos">
-                <tr><td colspan="6" class="loader">Conectando con la base de datos...</td></tr>
+                <tr><td colspan="6" style="text-align:center;">Cargando base de datos...</td></tr>
             </tbody>
         </table>
     </div>
 
     <script>
-        // CONFIGURACIÓN DE SUPABASE
-        const URL_SB = "https://rdyclinraavkirzfigjl.supabase.co"; 
-        const KEY_SB = "sb_publishable_fEGEgkJNYMzVPgzDaEwlsg_W1XiFyt6";
+        // Datos de conexión extraídos de tu tienda
+        const URL_TIENDA = "https://rdyclinraavkirzfigjl.supabase.co"; 
+        const KEY_TIENDA = "sb_publishable_fEGEgkJNYMzVPgzDaEwlsg_W1XiFyt6";
         
-        // IMPORTANTE: Cambiamos el nombre de la variable para evitar conflictos
-        const clienteSB = supabase.createClient(URL_SB, KEY_SB);
+        // Usamos un nombre de cliente que no choque con la librería
+        const dbContable = supabase.createClient(URL_TIENDA, KEY_TIENDA);
 
-        async function inicializar() {
-            await cargarAlmacen();
-            await calcularFinanzas();
+        async function cargarTodo() {
+            await obtenerProductos();
+            await obtenerFinanzas();
         }
 
-        async function cargarAlmacen() {
+        async function obtenerProductos() {
+            const { data, error } = await dbContable.from('productos').select('*').order('name');
             const tbody = document.getElementById('lista-productos');
-            
-            // Consultamos la tabla productos
-            const { data, error } = await clienteSB.from('productos').select('*').order('name');
-            
-            if (error) {
-                console.error("Error de conexión:", error);
-                tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Error: No se pudo cargar la base de datos. Revisa el RLS en Supabase.</td></tr>`;
-                return;
-            }
 
-            if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No hay productos registrados en la base de datos.</td></tr>`;
+            if (error) {
+                console.error(error);
+                tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Error: ${error.message}</td></tr>`;
                 return;
             }
 
@@ -107,41 +92,35 @@
             data.forEach(p => {
                 tbody.innerHTML += `
                     <tr>
-                        <td><img src="${p.img}" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border);"></td>
+                        <td><img src="${p.img}" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover;"></td>
                         <td><input type="text" class="wide" id="n-${p.id}" value="${p.name}"></td>
                         <td><input type="number" id="s-${p.id}" value="${p.stock}"></td>
                         <td>$<input type="number" id="pc-${p.id}" value="${p.cost_price || 0}"></td>
                         <td>$<input type="number" id="pv-${p.id}" value="${p.price}"></td>
-                        <td><button class="btn-save" onclick="actualizarProducto(${p.id})">Guardar</button></td>
+                        <td><button class="btn-save" onclick="guardarCambios(${p.id})">Guardar</button></td>
                     </tr>
                 `;
             });
         }
 
-        async function actualizarProducto(id) {
-            const nName = document.getElementById(`n-${id}`).value;
-            const nStock = document.getElementById(`s-${id}`).value;
-            const nCost = document.getElementById(`pc-${id}`).value;
-            const nPrice = document.getElementById(`pv-${id}`).value;
-
-            const { error } = await clienteSB.from('productos').update({
-                name: nName,
-                stock: nStock,
-                cost_price: nCost,
-                price: nPrice
+        async function guardarCambios(id) {
+            const { error } = await dbContable.from('productos').update({
+                name: document.getElementById(`n-${id}`).value,
+                stock: document.getElementById(`s-${id}`).value,
+                cost_price: document.getElementById(`pc-${id}`).value,
+                price: document.getElementById(`pv-${id}`).value
             }).eq('id', id);
 
-            if (error) {
-                alert("Error al guardar: " + error.message);
-            } else {
-                alert("✅ Producto actualizado en la nube");
-                inicializar();
+            if (error) alert("Error: " + error.message);
+            else {
+                alert("✅ ¡Sincronizado con la tienda!");
+                cargarTodo();
             }
         }
 
-        async function calcularFinanzas() {
-            const { data: movs, error } = await clienteSB.from('contabilidad').select('*');
-            if (error) return;
+        async function obtenerFinanzas() {
+            const { data: movs, error } = await dbContable.from('contabilidad').select('*');
+            if (error || !movs) return;
 
             let ingresos = 0;
             let utilidad = 0;
@@ -149,7 +128,6 @@
             movs.forEach(m => {
                 const monto = parseFloat(m.monto || 0);
                 const ganancia = parseFloat(m.ganancia || 0);
-
                 if (m.tipo === 'VENTA') {
                     ingresos += monto;
                     utilidad += ganancia; 
@@ -162,7 +140,7 @@
             document.getElementById('estado-resultado').innerText = `$${utilidad.toFixed(2)}`;
         }
 
-        window.onload = inicializar;
+        window.onload = cargarTodo;
     </script>
 </body>
 </html>
