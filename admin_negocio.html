@@ -55,7 +55,6 @@
         .btn-save { background: var(--accent); color: white; }
         .btn-delete { background: rgba(239, 68, 68, 0.1); color: var(--red); }
         .btn-delete:hover { background: var(--red); color: white; }
-        .btn-danger { background: var(--red); color: white; }
 
         img.prod-img { width: 45px; height: 45px; border-radius: 10px; object-fit: cover; background: #334155; }
 
@@ -76,7 +75,6 @@
             <div id="status" style="font-size: 0.8rem; color: var(--green);">● Sincronizado en Tiempo Real</div>
         </header>
 
-        <!-- DASHBOARD -->
         <div class="dashboard-grid">
             <div class="card">
                 <div class="metric-title">Utilidad Neta</div>
@@ -100,7 +98,6 @@
             <canvas id="rendimientoChart" height="100"></canvas>
         </div>
 
-        <!-- SECCIÓN ALMACÉN -->
         <div class="section-header">
             <h2>📦 Gestión de Almacén</h2>
             <input type="text" id="busqueda" class="search-box" placeholder="Buscar producto..." onkeyup="filtrarProductos()">
@@ -122,7 +119,6 @@
             </table>
         </div>
 
-        <!-- SECCIÓN HISTORIAL -->
         <div class="section-header">
             <h2>📜 Historial de Movimientos</h2>
             <button class="btn btn-delete" onclick="borrarTodoElHistorial()">
@@ -158,15 +154,17 @@
         let miGrafico;
 
         async function cargarTodo() {
-            await obtenerProductos();
-            await obtenerHistorial();
+            try {
+                await obtenerProductos();
+                await obtenerHistorial();
+            } catch (e) {
+                console.error("Error al cargar datos:", e);
+            }
         }
-
-        // --- FUNCIONES DE ALMACÉN ---
 
         async function obtenerProductos() {
             const { data, error } = await db.from('productos').select('*').order('name');
-            if (error) return;
+            if (error) throw error;
             productosLocal = data;
             renderizarProductos(data);
             actualizarValorInventario(data);
@@ -178,9 +176,9 @@
             let alertas = 0;
 
             lista.forEach(p => {
-                const stock = parseInt(p.stock);
-                const costo = parseFloat(p.cost_price || 0);
-                const precio = parseFloat(p.price || 0);
+                const stock = parseInt(p.stock) || 0;
+                const costo = parseFloat(p.cost_price) || 0;
+                const precio = parseFloat(p.price) || 0;
                 const margen = precio > 0 ? (((precio - costo) / precio) * 100).toFixed(0) : 0;
                 
                 if(stock <= 5) alertas++;
@@ -195,7 +193,7 @@
                         </td>
                         <td>
                             <span class="stock-badge ${stock <= 5 ? 'low-stock' : ''}">${stock} uds</span><br>
-                            <input type="number" id="s-${p.id}" value="${p.stock}" style="width:60px; margin-top:5px">
+                            <input type="number" id="s-${p.id}" value="${stock}" style="width:60px; margin-top:5px">
                         </td>
                         <td>$<input type="number" id="pc-${p.id}" value="${costo}" style="width:80px"></td>
                         <td>$<input type="number" id="pv-${p.id}" value="${precio}" style="width:80px"></td>
@@ -243,12 +241,9 @@
             document.getElementById('valor-inventario').innerText = `$${total.toLocaleString()}`;
         }
 
-
-        // --- FUNCIONES DE HISTORIAL Y FINANZAS ---
-
         async function obtenerHistorial() {
             const { data: movs, error } = await db.from('contabilidad').select('*').order('created_at', { ascending: false });
-            if (error || !movs) return;
+            if (error) throw error;
 
             const tbody = document.getElementById('lista-historial');
             tbody.innerHTML = movs.length ? "" : '<tr><td colspan="6" style="text-align:center">Sin movimientos</td></tr>';
@@ -258,11 +253,13 @@
             let datosGrafico = { ingresos: 0, gastos: 0 };
 
             movs.forEach(m => {
-                const monto = parseFloat(m.monto || 0);
-                const ganancia = parseFloat(m.ganancia || 0);
-                const fecha = new Date(m.created_at).toLocaleDateString();
+                const monto = parseFloat(m.monto) || 0;
+                const ganancia = parseFloat(m.ganancia) || 0;
+                
+                // Priorizar fecha_diaria si existe, sino usar created_at
+                const fechaRaw = m.fecha_diaria || m.created_at;
+                const fecha = new Date(fechaRaw).toLocaleDateString();
 
-                // Sumatorias
                 if (m.tipo === 'VENTA') {
                     ingresos += monto;
                     utilidadTotal += ganancia;
@@ -272,7 +269,6 @@
                     datosGrafico.gastos += monto;
                 }
 
-                // Render Historial
                 tbody.innerHTML += `
                     <tr>
                         <td style="color:#94a3b8; font-size:0.8rem">${fecha}</td>
@@ -305,14 +301,16 @@
 
         async function borrarTodoElHistorial() {
             if(confirm("⚠ ¡ATENCIÓN! Esto borrará todas las ventas y registros de contabilidad. ¿Deseas continuar?")) {
-                const { error } = await db.from('contabilidad').delete().neq('id', 0); // Borra todo
+                const { error } = await db.from('contabilidad').delete().neq('id', 0); 
                 if(error) alert("Error al limpiar");
                 else cargarTodo();
             }
         }
 
         function actualizarGrafico(datos) {
-            const ctx = document.getElementById('rendimientoChart').getContext('2d');
+            const canvas = document.getElementById('rendimientoChart');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
             if (miGrafico) miGrafico.destroy();
 
             miGrafico = new Chart(ctx, {
@@ -338,7 +336,7 @@
             });
         }
 
-        window.onload = cargarTodo;
+        window.addEventListener('load', cargarTodo);
     </script>
 </body>
 </html>
