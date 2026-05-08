@@ -18,45 +18,32 @@
             --hover: #243049;
         }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-        
         .container { max-width: 1200px; margin: 0 auto; }
-        
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         .logo { font-size: 1.5rem; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
-        
-        /* Dashboard Stats */
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .card { background: var(--card); padding: 25px; border-radius: 16px; border: 1px solid var(--border); transition: 0.3s; }
         .card:hover { border-color: var(--accent); transform: translateY(-3px); }
         .metric-title { font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; }
         .metric-value { font-size: 1.8rem; font-weight: 800; }
-        
-        /* Gráfico */
         .chart-container { background: var(--card); padding: 20px; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 40px; }
-
-        /* Controles y Tabla */
         .table-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 10px; }
-        .search-box { background: var(--card); border: 1px solid var(--border); color: white; padding: 12px 20px; border-radius: 10px; flex-grow: 1; max-width: 400px; }
-        
-        .almacen-container { background: var(--card); border-radius: 16px; border: 1px solid var(--border); overflow: hidden; }
+        .search-box, .select-month { background: var(--card); border: 1px solid var(--border); color: white; padding: 12px 20px; border-radius: 10px; }
+        .search-box { flex-grow: 1; max-width: 400px; }
+        .almacen-container, .historial-container { background: var(--card); border-radius: 16px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 40px; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #1e293b; color: #94a3b8; padding: 15px; font-size: 0.8rem; text-align: left; }
         td { padding: 15px; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
         tr:hover { background: var(--hover); }
-        
         .stock-badge { padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; }
         .low-stock { background: rgba(239, 68, 68, 0.2); color: var(--red); }
-        
-        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; outline: none; transition: 0.2s; }
-        input:focus { border-color: var(--accent); }
+        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; outline: none; }
         .btn-save { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.8rem; }
-        .btn-save:hover { filter: brightness(1.2); }
-        
         img.prod-img { width: 45px; height: 45px; border-radius: 10px; object-fit: cover; background: #334155; }
-
-        @media (max-width: 768px) {
-            .table-controls { flex-direction: column; align-items: stretch; }
-        }
+        
+        /* Estilos Historial */
+        .dia-header { background: #1e293b; padding: 10px 15px; font-weight: bold; color: var(--accent); }
+        .venta-item { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 10px 15px; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
     </style>
 </head>
 <body>
@@ -91,6 +78,21 @@
         </div>
 
         <div class="table-controls">
+            <h2>📊 Historial de Ventas Detallado</h2>
+            <select id="filtro-mes" class="select-month" onchange="obtenerFinanzas()">
+                <option value="0">Enero</option><option value="1">Febrero</option>
+                <option value="2">Marzo</option><option value="3">Abril</option>
+                <option value="4">Mayo</option><option value="5">Junio</option>
+                <option value="6">Julio</option><option value="7">Agosto</option>
+                <option value="8">Septiembre</option><option value="9">Octubre</option>
+                <option value="10">Noviembre</option><option value="11">Diciembre</option>
+            </select>
+        </div>
+        <div class="historial-container" id="historial-ventas">
+            <div style="padding:20px; text-align:center; color:#94a3b8;">Selecciona un mes para ver el desglose diario...</div>
+        </div>
+
+        <div class="table-controls">
             <h2>📦 Gestión de Almacén</h2>
             <input type="text" id="busqueda" class="search-box" placeholder="Buscar producto por nombre..." onkeyup="filtrarProductos()">
         </div>
@@ -122,6 +124,9 @@
         let productosLocal = [];
         let miGrafico;
 
+        // Configurar el mes actual por defecto en el selector
+        document.getElementById('filtro-mes').value = new Date().getMonth();
+
         async function cargarTodo() {
             await obtenerProductos();
             await obtenerFinanzas();
@@ -130,7 +135,6 @@
         async function obtenerProductos() {
             const { data, error } = await dbContable.from('productos').select('*').order('name');
             if (error) return;
-            
             productosLocal = data;
             renderizarTabla(data);
             actualizarValorInventario(data);
@@ -140,15 +144,12 @@
             const tbody = document.getElementById('lista-productos');
             tbody.innerHTML = "";
             let alertas = 0;
-
             lista.forEach(p => {
                 const stock = parseInt(p.stock);
                 const costo = parseFloat(p.cost_price || 0);
                 const precio = parseFloat(p.price || 0);
                 const margen = precio > 0 ? (((precio - costo) / precio) * 100).toFixed(0) : 0;
-                
                 if(stock <= 5) alertas++;
-
                 tbody.innerHTML += `
                     <tr>
                         <td>
@@ -185,55 +186,92 @@
         async function guardarCambios(id) {
             const btn = event.target;
             btn.innerText = "wait...";
-            
             const { error } = await dbContable.from('productos').update({
                 name: document.getElementById(`n-${id}`).value,
                 stock: document.getElementById(`s-${id}`).value,
                 cost_price: document.getElementById(`pc-${id}`).value,
                 price: document.getElementById(`pv-${id}`).value
             }).eq('id', id);
-
             if (error) alert("Error: " + error.message);
             else cargarTodo();
         }
 
         async function obtenerFinanzas() {
-            const { data: movs, error } = await dbContable.from('contabilidad').select('*');
+            const mesSeleccionado = parseInt(document.getElementById('filtro-mes').value);
+            const { data: movs, error } = await dbContable.from('contabilidad').select('*').order('created_at', { ascending: false });
+            
             if (error || !movs) return;
 
             let ingresos = 0;
             let utilidad = 0;
             let datosGrafico = { ingresos: 0, gastos: 0 };
+            
+            // Objeto para agrupar ventas por día
+            const ventasPorDia = {};
 
             movs.forEach(m => {
+                const fecha = new Date(m.created_at);
                 const monto = parseFloat(m.monto || 0);
                 const ganancia = parseFloat(m.ganancia || 0);
-                if (m.tipo === 'VENTA') {
-                    ingresos += monto;
-                    utilidad += ganancia;
-                    datosGrafico.ingresos += monto;
-                } else if (m.tipo === 'GASTO') {
-                    utilidad -= monto;
-                    datosGrafico.gastos += monto;
+
+                // Solo procesar si coincide con el mes seleccionado
+                if (fecha.getMonth() === mesSeleccionado) {
+                    if (m.tipo === 'VENTA') {
+                        ingresos += monto;
+                        utilidad += ganancia;
+                        datosGrafico.ingresos += monto;
+
+                        // Agrupar para el historial
+                        const diaClave = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'long' });
+                        if (!ventasPorDia[diaClave]) ventasPorDia[diaClave] = [];
+                        ventasPorDia[diaClave].push(m);
+
+                    } else if (m.tipo === 'GASTO') {
+                        utilidad -= monto;
+                        datosGrafico.gastos += monto;
+                    }
                 }
             });
 
             document.getElementById('efectivo-caja').innerText = `$${ingresos.toLocaleString()}`;
             document.getElementById('estado-resultado').innerText = `$${utilidad.toLocaleString()}`;
             
+            renderizarHistorial(ventasPorDia);
             actualizarGrafico(datosGrafico);
+        }
+
+        function renderizarHistorial(dias) {
+            const contenedor = document.getElementById('historial-ventas');
+            if (Object.keys(dias).length === 0) {
+                contenedor.innerHTML = `<div style="padding:20px; text-align:center; color:#94a3b8;">No hay ventas registradas en este mes.</div>`;
+                return;
+            }
+
+            contenedor.innerHTML = "";
+            for (const dia in dias) {
+                let htmlDia = `<div class="dia-header">${dia}</div>`;
+                dias[dia].forEach(v => {
+                    htmlDia += `
+                        <div class="venta-item">
+                            <span>📦 ${v.producto_nombre || 'Producto'}</span>
+                            <span style="text-align:center;">Cant: ${v.cantidad || 1}</span>
+                            <span style="text-align:right; color:var(--green); font-weight:bold;">+$${v.monto}</span>
+                        </div>
+                    `;
+                });
+                contenedor.innerHTML += htmlDia;
+            }
         }
 
         function actualizarGrafico(datos) {
             const ctx = document.getElementById('rendimientoChart').getContext('2d');
             if (miGrafico) miGrafico.destroy();
-
             miGrafico = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Ingresos Brutos', 'Gastos Operativos'],
+                    labels: ['Ingresos del Mes', 'Gastos del Mes'],
                     datasets: [{
-                        label: 'Balance en USD',
+                        label: 'USD',
                         data: [datos.ingresos, datos.gastos],
                         backgroundColor: ['#0ea5e9', '#ef4444'],
                         borderRadius: 8
